@@ -4,40 +4,27 @@ on:
   push:
   pull_request:
 
+env:
+  MAGO_PHP_VERSION: "8.2"
+  COVERAGE_PHP_VERSION: "8.5"
+
 jobs:
-  psalm:
-    name: Psalm
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.2"
-
-      - name: Install composer dependencies
-        uses: "ramsey/composer-install@v1"
-
-      - name: Run Psalm
-        run: vendor/bin/psalm --show-info=false --find-unused-psalm-suppress --no-progress
-
   phpunit:
     name: PHPUnit
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         php-version:
-          - "8.1"
           - "8.2"
           - "8.3"
+          - "8.4"
+          - "8.5"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -46,20 +33,45 @@ jobs:
           coverage: xdebug
 
       - name: Install composer dependencies
-        uses: "ramsey/composer-install@v1"
+        uses: "ramsey/composer-install@v3"
 
       - name: Run PHPUnit
         run: vendor/bin/phpunit
-        if: ${{ matrix.php-version != '8.2' }}
+        if: ${{ matrix.php-version != env.COVERAGE_PHP_VERSION }}
 
       - name: Run PHPUnit with coverage
         run: |
           mkdir -p mkdir -p build/logs
           vendor/bin/phpunit --coverage-clover build/logs/clover.xml
-        if: ${{ matrix.php-version == '8.2' }}
+        if: ${{ matrix.php-version == env.COVERAGE_PHP_VERSION }}
 
       - name: Upload coverage report to Coveralls
         run: vendor/bin/php-coveralls --coverage_clover=build/logs/clover.xml -v
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: ${{ matrix.php-version == '8.2' }}
+        if: ${{ matrix.php-version == env.COVERAGE_PHP_VERSION }}
+
+  mago:
+    name: Mago
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.MAGO_PHP_VERSION }}
+
+      - name: Install composer dependencies
+        uses: "ramsey/composer-install@v3"
+
+      - name: Mago format
+        run: vendor/bin/mago format --check
+
+      - name: Mago lint
+        run: vendor/bin/mago lint --minimum-fail-level=warning
+
+      - name: Mago analyze
+        run: vendor/bin/mago analyze --minimum-fail-level=warning

@@ -8,6 +8,8 @@ use Nicebooks\Isbn\Exception\InvalidIsbnException;
 use Nicebooks\Isbn\Exception\IsbnException;
 use Nicebooks\Isbn\Exception\IsbnNotConvertibleException;
 use Nicebooks\Isbn\Isbn;
+use Nicebooks\Isbn\Isbn10;
+use Nicebooks\Isbn\Isbn13;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -21,11 +23,12 @@ class IsbnTest extends TestCase
      * @param string $string The expected string value of the ISBN.
      * @param bool   $is13   Whether the ISBN is expected to be an ISBN-13.
      */
-    private function assertIsbnEquals(Isbn $isbn, string $string, bool $is13) : void
+    private static function assertIsbnEquals(Isbn $isbn, string $string, bool $is13): void
     {
-        $this->assertSame($string, (string) $isbn);
-        $this->assertSame($is13, $isbn->is13());
-        $this->assertSame(! $is13, $isbn->is10());
+        self::assertSame($string, (string) $isbn);
+        self::assertSame($string, $isbn->toString());
+        self::assertSame($is13, $isbn->is13());
+        self::assertSame(!$is13, $isbn->is10());
     }
 
     /**
@@ -33,31 +36,74 @@ class IsbnTest extends TestCase
      * @param string $string The expected string value of the resulting Isbn object.
      * @param bool   $is13   Whether the ISBN is expected to be an ISBN-13.
      */
-    #[DataProvider('providerGet')]
-    public function testGet(string $isbn, string $string, bool $is13) : void
+    #[DataProvider('providerOf')]
+    public function testOf(string $isbn, string $string, bool $is13): void
     {
-        $this->assertIsbnEquals(Isbn::of($isbn), $string, $is13);
+        self::assertIsbnEquals(Isbn::of($isbn), $string, $is13);
     }
 
-    public static function providerGet() : array
+    public static function providerOf(): array
     {
         return [
-            [' 1-234-56789-x ', '123456789X', false],
+            [' 1-234-56789-x ',     '123456789X',    false],
             [' 978-0-00-000000-2 ', '9780000000002', true],
+        ];
+    }
+
+    #[DataProvider('providerOfIsbn10')]
+    public function testOfIsbn10(string $isbn, string $expected): void
+    {
+        self::assertIsbnEquals(Isbn10::of($isbn), $expected, false);
+    }
+
+    public static function providerOfIsbn10(): array
+    {
+        return [
+            [' 1-234-56789-x ',  '123456789X'],
+            [' 978-1234567897 ', '123456789X'],
+        ];
+    }
+
+    #[DataProvider('providerOfIsbn10ThrowsException')]
+    public function testOfIsbn10ThrowsException(string $isbn): void
+    {
+        $this->expectException(IsbnNotConvertibleException::class);
+        Isbn10::of($isbn);
+    }
+
+    public static function providerOfIsbn10ThrowsException(): array
+    {
+        return [
+            [' 979-1234567896 '],
+        ];
+    }
+
+    #[DataProvider('providerOfIsbn13')]
+    public function testOfIsbn13(string $isbn, string $expected): void
+    {
+        self::assertIsbnEquals(Isbn13::of($isbn), $expected, true);
+    }
+
+    public static function providerOfIsbn13(): array
+    {
+        return [
+            [' 1-234-56789-x ',  '9781234567897'],
+            [' 978-1234567897 ', '9781234567897'],
+            [' 979-1234567896 ', '9791234567896'],
         ];
     }
 
     /**
      * @param string $invalidIsbn The invalid ISBN.
      */
-    #[DataProvider('providerGetInvalidIsbnThrowsException')]
-    public function testGetInvalidIsbnThrowsException(string $invalidIsbn) : void
+    #[DataProvider('providerOfInvalidIsbnThrowsException')]
+    public function testOfInvalidIsbnThrowsException(string $invalidIsbn): void
     {
         $this->expectException(InvalidIsbnException::class);
         Isbn::of($invalidIsbn);
     }
 
-    public static function providerGetInvalidIsbnThrowsException() : array
+    public static function providerOfInvalidIsbnThrowsException(): array
     {
         return [
             ['123456789'],
@@ -67,7 +113,7 @@ class IsbnTest extends TestCase
             ['1234567890123'],
             ['9780000000000'],
             ['9790000000000'],
-            ["123456789X\x80"]
+            ["123456789X\x80"],
         ];
     }
 
@@ -76,17 +122,17 @@ class IsbnTest extends TestCase
      * @param string $isbn10 The expected ISBN-10 output.
      */
     #[DataProvider('providerTo10')]
-    public function testTo10(string $isbn13, string $isbn10) : void
+    public function testTo10(string $isbn13, string $isbn10): void
     {
         $inputIsbn = Isbn::of($isbn13);
         $outputIsbn = $inputIsbn->to10();
 
         // Test the input object as well to ensure it's unaffected.
-        $this->assertIsbnEquals($inputIsbn, $isbn13, true);
-        $this->assertIsbnEquals($outputIsbn, $isbn10, false);
+        self::assertIsbnEquals($inputIsbn, $isbn13, true);
+        self::assertIsbnEquals($outputIsbn, $isbn10, false);
     }
 
-    public static function providerTo10() : array
+    public static function providerTo10(): array
     {
         return [
             ['9780123456786', '0123456789'],
@@ -102,10 +148,10 @@ class IsbnTest extends TestCase
         ];
     }
 
-    public function test10to10ReturnsThis() : void
+    public function test10to10ReturnsThis(): void
     {
         $isbn = Isbn::of('123456789X');
-        $this->assertSame($isbn, $isbn->to10());
+        self::assertSame($isbn, $isbn->to10());
     }
 
     /**
@@ -113,16 +159,16 @@ class IsbnTest extends TestCase
      * @param bool   $isConvertible Whether the ISBN is convertible to an ISBN-10.
      */
     #[DataProvider('providerIsConvertibleTo10')]
-    public function testIsConvertibleTo10(string $isbn, bool $isConvertible) : void
+    public function testIsConvertibleTo10(string $isbn, bool $isConvertible): void
     {
-        $this->assertSame($isConvertible, Isbn::of($isbn)->isConvertibleTo10());
+        self::assertSame($isConvertible, Isbn::of($isbn)->isConvertibleTo10());
     }
 
-    public static function providerIsConvertibleTo10() : array
+    public static function providerIsConvertibleTo10(): array
     {
         return [
-            ['0123456789', true],
-            ['123456789X', true],
+            ['0123456789',    true],
+            ['123456789X',    true],
             ['9780123456786', true],
             ['9781234567897', true],
             ['9790000000001', false],
@@ -134,13 +180,13 @@ class IsbnTest extends TestCase
      * @param string $isbn13 The non-convertible ISBN-13.
      */
     #[DataProvider('providerNotConvertibleTo10')]
-    public function testNotConvertibleTo10ThrowsException(string $isbn13) : void
+    public function testNotConvertibleTo10ThrowsException(string $isbn13): void
     {
         $this->expectException(IsbnNotConvertibleException::class);
         Isbn::of($isbn13)->to10();
     }
 
-    public static function providerNotConvertibleTo10() : array
+    public static function providerNotConvertibleTo10(): array
     {
         return [
             ['9790000000001'],
@@ -153,17 +199,17 @@ class IsbnTest extends TestCase
      * @param string $isbn13 The expected ISBN-13 output.
      */
     #[DataProvider('providerTo13')]
-    public function testTo13(string $isbn10, string $isbn13) : void
+    public function testTo13(string $isbn10, string $isbn13): void
     {
         $inputIsbn = Isbn::of($isbn10);
         $outputIsbn = $inputIsbn->to13();
 
         // Test the input object as well to ensure it's unaffected.
-        $this->assertIsbnEquals($inputIsbn, $isbn10, false);
-        $this->assertIsbnEquals($outputIsbn, $isbn13, true);
+        self::assertIsbnEquals($inputIsbn, $isbn10, false);
+        self::assertIsbnEquals($outputIsbn, $isbn13, true);
     }
 
-    public static function providerTo13() : array
+    public static function providerTo13(): array
     {
         return [
             ['0123456789', '9780123456786'],
@@ -179,58 +225,68 @@ class IsbnTest extends TestCase
         ];
     }
 
-    public function test13to13ReturnsThis() : void
+    public function test13to13ReturnsThis(): void
     {
         $isbn = Isbn::of('9784567890120');
-        $this->assertSame($isbn, $isbn->to13());
+        self::assertSame($isbn, $isbn->to13());
     }
 
     /**
-     * @param string $isbn           The ISBN to test.
-     * @param string $expectedFormat The expected formatted output.
-     * @param string $expectedGroup  The expected group name.
+     * @param string $isbn                  The ISBN to test.
+     * @param string $expectedFormat        The expected formatted output.
+     * @param string $registrationGroupName The expected registration group name.
      */
     #[DataProvider('providerInfoAndFormat')]
-    public function testInfoAndFormat(string $isbn, string $expectedFormat, string $expectedGroup) : void
+    public function testInfoAndFormat(string $isbn, string $expectedFormat, string $registrationGroupName): void
     {
         $isbn = Isbn::of($isbn);
         $expectedParts = explode('-', $expectedFormat);
 
-        $this->assertSame($expectedFormat, $isbn->format());
-        $this->assertSame($expectedParts, $isbn->getParts());
+        self::assertSame($expectedFormat, $isbn->format());
+        self::assertSame($expectedFormat, $isbn->toFormattedString());
+        self::assertSame($expectedParts, $isbn->getParts());
 
         if ($isbn->is13()) {
-            $groupIdentifier     = $expectedParts[0] . '-' . $expectedParts[1];
+            $groupIdentifier = $expectedParts[0] . '-' . $expectedParts[1]; // legacy
+            $registrationGroupPrefix = $expectedParts[0];
+            $registrationGroupIdentifier = $expectedParts[1];
             $publisherIdentifier = $expectedParts[2];
-            $titleIdentifier     = $expectedParts[3];
-            $checkDigit          = $expectedParts[4];
+            $titleIdentifier = $expectedParts[3];
+            $checkDigit = $expectedParts[4];
         } else {
-            $groupIdentifier     = $expectedParts[0];
+            $groupIdentifier = $expectedParts[0]; // legacy
+            $registrationGroupPrefix = '978';
+            $registrationGroupIdentifier = $expectedParts[0];
             $publisherIdentifier = $expectedParts[1];
-            $titleIdentifier     = $expectedParts[2];
-            $checkDigit          = $expectedParts[3];
+            $titleIdentifier = $expectedParts[2];
+            $checkDigit = $expectedParts[3];
         }
 
-        $this->assertSame($groupIdentifier, $isbn->getGroupIdentifier());
-        $this->assertSame($publisherIdentifier, $isbn->getPublisherIdentifier());
-        $this->assertSame($titleIdentifier, $isbn->getTitleIdentifier());
-        $this->assertSame($checkDigit, $isbn->getCheckDigit());
+        self::assertSame($groupIdentifier, $isbn->getGroupIdentifier());
+        self::assertSame($publisherIdentifier, $isbn->getPublisherIdentifier());
+        self::assertSame($titleIdentifier, $isbn->getTitleIdentifier());
+        self::assertSame($checkDigit, $isbn->getCheckDigit());
 
-        $this->assertSame($expectedGroup, $isbn->getGroupName());
+        self::assertSame($registrationGroupName, $isbn->getGroupName());
+
+        $registrationGroup = $isbn->getRegistrationGroup();
+        self::assertSame($registrationGroupPrefix, $registrationGroup->prefix);
+        self::assertSame($registrationGroupIdentifier, $registrationGroup->identifier);
+        self::assertSame($registrationGroup->name, $registrationGroupName);
     }
 
-    public static function providerInfoAndFormat() : array
+    public static function providerInfoAndFormat(): array
     {
         return [
-            ['0001234560', '0-00-123456-0', 'English language'],
-            ['0321234561', '0-321-23456-1', 'English language'],
-            ['0765432102', '0-7654-3210-2', 'English language'],
-            ['0876543212', '0-87654-321-2', 'English language'],
-            ['0912345675', '0-912345-67-5', 'English language'],
-            ['0987654322', '0-9876543-2-2', 'English language'],
-            ['9995501236', '99955-0-123-6', 'Srpska, Republic of'],
-            ['9995523450', '99955-23-45-0', 'Srpska, Republic of'],
-            ['999556789X', '99955-678-9-X', 'Srpska, Republic of'],
+            ['0001234560',    '0-00-123456-0',     'English language'],
+            ['0321234561',    '0-321-23456-1',     'English language'],
+            ['0765432102',    '0-7654-3210-2',     'English language'],
+            ['0876543212',    '0-87654-321-2',     'English language'],
+            ['0912345675',    '0-912345-67-5',     'English language'],
+            ['0987654322',    '0-9876543-2-2',     'English language'],
+            ['9995501236',    '99955-0-123-6',     'Srpska, Republic of'],
+            ['9995523450',    '99955-23-45-0',     'Srpska, Republic of'],
+            ['999556789X',    '99955-678-9-X',     'Srpska, Republic of'],
 
             ['9780001234567', '978-0-00-123456-7', 'English language'],
             ['9780321234568', '978-0-321-23456-8', 'English language'],
@@ -250,47 +306,51 @@ class IsbnTest extends TestCase
     }
 
     #[DataProvider('providerIsValidGroupAndRange')]
-    public function testIsValidGroupAndRange(string $isbnString, bool $isValidGroup, bool $isValidRange) : void
+    public function testIsValidGroupAndRange(string $isbnString, bool $hasValidRegistrationGroup, bool $isValid): void
     {
         $isbn = Isbn::of($isbnString);
 
-        $this->assertSame($isValidGroup, $isbn->isValidGroup());
-        $this->assertSame($isValidRange, $isbn->isValidRange());
+        self::assertSame($hasValidRegistrationGroup, $isbn->isValidGroup());
+        self::assertSame($hasValidRegistrationGroup, $isbn->hasValidRegistrationGroup());
+        self::assertSame($isValid, $isbn->isValidRange());
+        self::assertSame($isValid, $isbn->isValid());
 
-        if (! $isValidGroup) {
-            $this->assertException(IsbnException::class, function() use ($isbn) {
+        if (!$hasValidRegistrationGroup) {
+            self::assertException(IsbnException::class, static function () use ($isbn) {
+                $isbn->getRegistrationGroup();
+            });
+            self::assertException(IsbnException::class, static function () use ($isbn) {
                 $isbn->getGroupIdentifier();
             });
-            $this->assertException(IsbnException::class, function() use ($isbn) {
+            self::assertException(IsbnException::class, static function () use ($isbn) {
                 $isbn->getGroupName();
             });
 
             // ISBN with invalid group/range cannot be formatted
-            $this->assertSame($isbnString, $isbn->format());
+            self::assertSame($isbnString, $isbn->format());
         }
 
-        if (! $isValidRange) {
-
-            $this->assertException(IsbnException::class, function() use ($isbn) {
+        if (!$isValid) {
+            self::assertException(IsbnException::class, static function () use ($isbn) {
                 $isbn->getPublisherIdentifier();
             });
-            $this->assertException(IsbnException::class, function() use ($isbn) {
+            self::assertException(IsbnException::class, static function () use ($isbn) {
                 $isbn->getTitleIdentifier();
             });
-            $this->assertException(IsbnException::class, function() use ($isbn) {
+            self::assertException(IsbnException::class, static function () use ($isbn) {
                 $isbn->getParts();
             });
         }
     }
 
-    public static function providerIsValidGroupAndRange() : array
+    public static function providerIsValidGroupAndRange(): array
     {
         return [
-            ['0001234560', true, true],
-            ['9983000008', true, false],
-            ['9999999999', false, false],
-            ['9780001234567', true, true],
-            ['9789983000009', true, false],
+            ['0001234560',    true,  true],
+            ['9983000008',    true,  false],
+            ['9999999999',    false, false],
+            ['9780001234567', true,  true],
+            ['9789983000009', true,  false],
             ['9789999999991', false, false],
         ];
     }
@@ -300,7 +360,7 @@ class IsbnTest extends TestCase
      *
      * @throws \Exception
      */
-    private function assertException(string $expectedException, callable $function) : void
+    private function assertException(string $expectedException, callable $function): void
     {
         $this->addToAssertionCount(1);
 
@@ -314,7 +374,7 @@ class IsbnTest extends TestCase
             throw $e;
         }
 
-        $this->fail('Failed asserting that exception of type ' . $expectedException . ' is thrown.');
+        self::fail('Failed asserting that exception of type ' . $expectedException . ' is thrown.');
     }
 
     /**
@@ -322,22 +382,22 @@ class IsbnTest extends TestCase
      * @param string $anotherIsbn The ISBN-10 that is expected to be equal to $isbn.
      */
     #[DataProvider('providerIsEqualTo')]
-    public function testIsEqualTo(string $isbn, string $anotherIsbn, bool $isEqual) : void
+    public function testIsEqualTo(string $isbn, string $anotherIsbn, bool $isEqual): void
     {
-        $this->assertSame($isEqual, Isbn::of($isbn)->isEqualTo(Isbn::of($anotherIsbn)));
+        self::assertSame($isEqual, Isbn::of($isbn)->isEqualTo(Isbn::of($anotherIsbn)));
     }
 
-    public static function providerIsEqualTo() : array
+    public static function providerIsEqualTo(): array
     {
         return [
-            ['9780123456786', '0123456789', true],
-            ['9781234567897', '123456789X', true],
-            ['5678901230', '9785678901231', true],
-            ['6789012346', '9786789012342', true],
-            ['9783456789019', '123456789X', false],
-            ['9784567890120', '123456789X', false],
-            ['8901234564', '9786789012342', false],
-            ['9012345677', '9786789012342', false],
+            ['9780123456786', '0123456789',    true],
+            ['9781234567897', '123456789X',    true],
+            ['5678901230',    '9785678901231', true],
+            ['6789012346',    '9786789012342', true],
+            ['9783456789019', '123456789X',    false],
+            ['9784567890120', '123456789X',    false],
+            ['8901234564',    '9786789012342', false],
+            ['9012345677',    '9786789012342', false],
         ];
     }
 }
